@@ -94,12 +94,23 @@ class TensionSimulation {
 
         // Solve system of equations for tensions
         const det = ux1 * uy2 - ux2 * uy1;
-        if (Math.abs(det) < 1e-6) return { t1: 0, t2: 0 }; // Avoid division by zero
+        if (Math.abs(det) < 1e-6) return { 
+            t1: 0, t2: 0,
+            f1x: 0, f1y: 0,
+            f2x: 0, f2y: 0
+        }; // Avoid division by zero
 
         const t1 = (-forceX * uy2 + forceY * ux2) / det;
         const t2 = (forceX * uy1 - forceY * ux1) / det;
 
-        return { t1, t2 };
+        // Calculate force components at P1 and P2
+        // Note: The force on the anchor points is in the opposite direction of the cable
+        const f1x = -t1 * ux1;
+        const f1y = -t1 * uy1;
+        const f2x = -t2 * ux2;
+        const f2y = -t2 * uy2;
+
+        return { t1, t2, f1x, f1y, f2x, f2y };
     }
 
     updateDisplay() {
@@ -108,12 +119,18 @@ class TensionSimulation {
         document.getElementById('p2-coords').textContent = `(${this.p2.x.toFixed(0)}, ${this.p2.y.toFixed(0)})`;
         document.getElementById('p3-coords').textContent = `(${this.p3.x.toFixed(0)}, ${this.p3.y.toFixed(0)})`;
 
-        // Calculate and update tensions
-        const { t1, t2 } = this.calculateTensions();
+        // Calculate and update tensions and forces
+        const { t1, t2, f1x, f1y, f2x, f2y } = this.calculateTensions();
         document.getElementById('tension1').textContent = `${Math.abs(t1).toFixed(1)} N`;
         document.getElementById('tension2').textContent = `${Math.abs(t2).toFixed(1)} N`;
         document.getElementById('force3').textContent = 
             `${this.forceMagnitude.toFixed(1)} N at ${this.forceDirection}°`;
+        
+        // Update force components at anchor points
+        document.getElementById('p1-force').textContent = 
+            `(${f1x.toFixed(1)}i, ${f1y.toFixed(1)}j) N`;
+        document.getElementById('p2-force').textContent = 
+            `(${f2x.toFixed(1)}i, ${f2y.toFixed(1)}j) N`;
     }
 
     draw() {

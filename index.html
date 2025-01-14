@@ -11,15 +11,22 @@
         <h1>WebTension Simulation</h1>
         <div class="simulation-container">
             <canvas id="tensionCanvas"></canvas>
-            <div id="coordinates">
-                <div>P1: <span id="p1-coords"></span></div>
-                <div>P2: <span id="p2-coords"></span></div>
-                <div>P3: <span id="p3-coords"></span></div>
-            </div>
-            <div id="forces">
-                <div>T1: <span id="tension1"></span></div>
-                <div>T2: <span id="tension2"></span></div>
-                <div>Force on P3: <span id="force3"></span></div>
+            <div class="info-panel">
+                <div id="coordinates">
+                    <h3>Coordinates</h3>
+                    <div>P1: <span id="p1-coords"></span></div>
+                    <div>P2: <span id="p2-coords"></span></div>
+                    <div>P3: <span id="p3-coords"></span></div>
+                </div>
+                <div id="forces">
+                    <h3>Forces</h3>
+                    <div>T1: <span id="tension1"></span></div>
+                    <div>T2: <span id="tension2"></span></div>
+                    <div>Force on P3: <span id="force3"></span></div>
+                    <h4>Forces at Anchor Points</h4>
+                    <div>P1 Force: <span id="p1-force"></span></div>
+                    <div>P2 Force: <span id="p2-force"></span></div>
+                </div>
             </div>
         </div>
         <div class="controls">
