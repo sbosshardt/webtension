@@ -22,7 +22,7 @@ class TensionSimulation {
         
         // Force properties
         this.forceMagnitude = 50;
-        this.forceDirection = 0;
+        this.forceDirection = 90;
         
         this.setupEventListeners();
         this.animate();
@@ -170,22 +170,120 @@ class TensionSimulation {
         document.getElementById('net-torque').textContent = `${(torque1 + torque2).toFixed(1)} N⋅m`;
     }
 
+    calculateLabelPosition(point, label) {
+        const padding = 2;
+        const distance = 25; // Increased distance from point
+        
+        // Generate 8 possible positions around the point
+        const positions = [
+            { x: point.x + distance, y: point.y }, // right
+            { x: point.x + distance * 0.7, y: point.y - distance * 0.7 }, // top-right
+            { x: point.x, y: point.y - distance }, // top
+            { x: point.x - distance * 0.7, y: point.y - distance * 0.7 }, // top-left
+            { x: point.x - distance, y: point.y }, // left
+            { x: point.x - distance * 0.7, y: point.y + distance * 0.7 }, // bottom-left
+            { x: point.x, y: point.y + distance }, // bottom
+            { x: point.x + distance * 0.7, y: point.y + distance * 0.7 }  // bottom-right
+        ];
+
+        // Get angles to other points and force arrow
+        const angles = [];
+        
+        // Add angles to other points and include line segments
+        const points = [this.p0, this.p1, this.p2, this.p3];
+        points.forEach(p => {
+            if (p !== point) {
+                const angle = Math.atan2(p.y - point.y, p.x - point.x);
+                // Add multiple angles for the line thickness
+                angles.push(angle - 0.1, angle, angle + 0.1);
+            }
+        });
+
+        // Add force arrow angles if this is P3
+        if (point === this.p3) {
+            const forceAngle = (this.forceDirection * Math.PI) / 180;
+            angles.push(forceAngle - 0.1, forceAngle, forceAngle + 0.1);
+        }
+
+        // Convert angles to sectors to avoid (each line takes up 60° sector for better avoidance)
+        const badSectors = angles.map(angle => {
+            const sector = Math.floor((angle + Math.PI) * 8 / (2 * Math.PI));
+            return sector % 8;
+        });
+
+        // Score each position
+        const scores = positions.map((pos, index) => {
+            // Start with base score from angle consideration
+            let score = badSectors.reduce((min, badSector) => {
+                const dist = Math.min(
+                    Math.abs(index - badSector),
+                    8 - Math.abs(index - badSector)
+                );
+                return Math.min(min, dist);
+            }, 8);
+
+            // Penalize positions that would put the label outside canvas bounds
+            const margin = 5;
+            const estimatedWidth = 20;  // Approximate width of label
+            const estimatedHeight = 14; // Approximate height of label
+            
+            if (pos.x - estimatedWidth < margin || 
+                pos.x + estimatedWidth > this.canvas.width - margin ||
+                pos.y - estimatedHeight < margin || 
+                pos.y + estimatedHeight > this.canvas.height - margin) {
+                score -= 2;
+            }
+
+            return score;
+        });
+
+        // Choose the position with the highest score
+        const bestIndex = scores.indexOf(Math.max(...scores));
+        const pos = positions[bestIndex];
+
+        // Adjust text alignment based on position
+        let align = 'center';
+        let baseline = 'middle';
+        
+        // Fine-tune alignment based on octant
+        switch (bestIndex) {
+            case 0: // right
+                align = 'left'; break;
+            case 1: // top-right
+                align = 'left'; baseline = 'bottom'; break;
+            case 2: // top
+                baseline = 'bottom'; break;
+            case 3: // top-left
+                align = 'right'; baseline = 'bottom'; break;
+            case 4: // left
+                align = 'right'; break;
+            case 5: // bottom-left
+                align = 'right'; baseline = 'top'; break;
+            case 6: // bottom
+                baseline = 'top'; break;
+            case 7: // bottom-right
+                align = 'left'; baseline = 'top'; break;
+        }
+
+        return { pos, align, baseline };
+    }
+
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw connecting arms from P0 to P1 and P2
-        this.ctx.strokeStyle = '#666';
-        this.ctx.setLineDash([5, 5]);
+        // Draw connecting arms from P0 to P1 and P2 (thick black lines)
+        this.ctx.strokeStyle = '#000';
+        this.ctx.lineWidth = 4;  // Thicker lines for the arms
         this.ctx.beginPath();
         this.ctx.moveTo(this.p0.x, this.p0.y);
         this.ctx.lineTo(this.p1.x, this.p1.y);
         this.ctx.moveTo(this.p0.x, this.p0.y);
         this.ctx.lineTo(this.p2.x, this.p2.y);
         this.ctx.stroke();
-        this.ctx.setLineDash([]);
 
-        // Draw cables
-        this.ctx.strokeStyle = '#000';
+        // Draw cables (reddish brown lines)
+        this.ctx.strokeStyle = '#A52A2A';  // Reddish brown color
+        this.ctx.lineWidth = 2;  // Reset to original thickness
         this.ctx.beginPath();
         this.ctx.moveTo(this.p1.x, this.p1.y);
         this.ctx.lineTo(this.p3.x, this.p3.y);
@@ -193,6 +291,7 @@ class TensionSimulation {
         this.ctx.stroke();
 
         // Draw force arrow
+        this.ctx.strokeStyle = '#000';  // Black color for the force arrow
         const forceAngle = (this.forceDirection * Math.PI) / 180;
         const arrowLength = this.forceMagnitude;
         const endX = this.p3.x + Math.cos(forceAngle) * arrowLength;
@@ -219,7 +318,7 @@ class TensionSimulation {
         );
         this.ctx.stroke();
 
-        // Draw points
+        // Draw points and labels
         const points = [
             { point: this.p0, label: "P0" },
             { point: this.p1, label: "P1" },
@@ -228,16 +327,46 @@ class TensionSimulation {
         ];
 
         points.forEach(({ point, label }) => {
+            // Draw point
             this.ctx.beginPath();
             this.ctx.arc(point.x, point.y, this.pointRadius, 0, Math.PI * 2);
             this.ctx.fillStyle = point === this.selectedPoint ? '#ff4444' : '#4444ff';
             this.ctx.fill();
             
-            // Draw label
-            this.ctx.fillStyle = '#000';
+            // Calculate best label position
+            const { pos, align, baseline } = this.calculateLabelPosition(point, label);
+            
+            // Draw label background
             this.ctx.font = '14px Arial';
-            this.ctx.fillText(label, point.x + 10, point.y - 10);
+            const textMetrics = this.ctx.measureText(label);
+            const padding = 2;
+            const textHeight = 14; // Approximate height of the font
+            
+            let bgX = pos.x;
+            if (align === 'right') bgX -= textMetrics.width;
+            
+            let bgY = pos.y;
+            if (baseline === 'middle') bgY -= textHeight / 2;
+            if (baseline === 'bottom') bgY -= textHeight;
+            
+            this.ctx.fillStyle = 'white';
+            this.ctx.fillRect(
+                bgX - padding,
+                bgY - padding,
+                textMetrics.width + padding * 2,
+                textHeight + padding * 2
+            );
+            
+            // Draw label text
+            this.ctx.fillStyle = '#000';
+            this.ctx.textAlign = align;
+            this.ctx.textBaseline = baseline;
+            this.ctx.fillText(label, pos.x, pos.y);
         });
+        
+        // Reset text alignment for future drawings
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'alphabetic';
     }
 
     animate() {
