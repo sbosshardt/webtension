@@ -12,6 +12,7 @@ class TensionSimulation {
         this.setupCanvas();
 
         // Initialize points
+        this.p0 = new Point(250, 50);  // Pivot point
         this.p1 = new Point(100, 100);
         this.p2 = new Point(400, 100);
         this.p3 = new Point(250, 250);
@@ -28,9 +29,22 @@ class TensionSimulation {
     }
 
     setupCanvas() {
+        // Set the canvas resolution to match CSS size
         this.canvas.width = 500;
         this.canvas.height = 400;
         this.ctx.lineWidth = 2;
+        
+        // Store the canvas scale factors
+        this.scaleX = this.canvas.width / this.canvas.offsetWidth;
+        this.scaleY = this.canvas.height / this.canvas.offsetHeight;
+    }
+
+    getMousePos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left) * this.scaleX,
+            y: (e.clientY - rect.top) * this.scaleY
+        };
     }
 
     setupEventListeners() {
@@ -46,17 +60,21 @@ class TensionSimulation {
         document.getElementById('forceDirection').addEventListener('input', (e) => {
             this.forceDirection = parseFloat(e.target.value);
         });
+
+        // Update scale factors when window is resized
+        window.addEventListener('resize', () => {
+            this.scaleX = this.canvas.width / this.canvas.offsetWidth;
+            this.scaleY = this.canvas.height / this.canvas.offsetHeight;
+        });
     }
 
     handleMouseDown(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const pos = this.getMousePos(e);
 
         // Check if clicked near any point
-        const points = [this.p1, this.p2, this.p3];
+        const points = [this.p0, this.p1, this.p2, this.p3];
         for (let point of points) {
-            if (Math.hypot(x - point.x, y - point.y) < this.pointRadius) {
+            if (Math.hypot(pos.x - point.x, pos.y - point.y) < this.pointRadius) {
                 this.selectedPoint = point;
                 break;
             }
@@ -66,9 +84,9 @@ class TensionSimulation {
     handleMouseMove(e) {
         if (!this.selectedPoint) return;
 
-        const rect = this.canvas.getBoundingClientRect();
-        this.selectedPoint.x = e.clientX - rect.left;
-        this.selectedPoint.y = e.clientY - rect.top;
+        const pos = this.getMousePos(e);
+        this.selectedPoint.x = pos.x;
+        this.selectedPoint.y = pos.y;
     }
 
     calculateTensions() {
@@ -97,7 +115,9 @@ class TensionSimulation {
         if (Math.abs(det) < 1e-6) return { 
             t1: 0, t2: 0,
             f1x: 0, f1y: 0,
-            f2x: 0, f2y: 0
+            f2x: 0, f2y: 0,
+            torque1: 0,
+            torque2: 0
         }; // Avoid division by zero
 
         const t1 = (-forceX * uy2 + forceY * ux2) / det;
@@ -110,33 +130,62 @@ class TensionSimulation {
         const f2x = -t2 * ux2;
         const f2y = -t2 * uy2;
 
-        return { t1, t2, f1x, f1y, f2x, f2y };
+        // Calculate torques about P0
+        // Torque = r × F = rx*Fy - ry*Fx
+        const r1x = this.p1.x - this.p0.x;
+        const r1y = this.p1.y - this.p0.y;
+        const r2x = this.p2.x - this.p0.x;
+        const r2y = this.p2.y - this.p0.y;
+
+        const torque1 = r1x * f1y - r1y * f1x;
+        const torque2 = r2x * f2y - r2y * f2x;
+
+        return { t1, t2, f1x, f1y, f2x, f2y, torque1, torque2 };
     }
 
     updateDisplay() {
         // Update coordinates display
+        document.getElementById('p0-coords').textContent = `(${this.p0.x.toFixed(0)}, ${this.p0.y.toFixed(0)})`;
         document.getElementById('p1-coords').textContent = `(${this.p1.x.toFixed(0)}, ${this.p1.y.toFixed(0)})`;
         document.getElementById('p2-coords').textContent = `(${this.p2.x.toFixed(0)}, ${this.p2.y.toFixed(0)})`;
         document.getElementById('p3-coords').textContent = `(${this.p3.x.toFixed(0)}, ${this.p3.y.toFixed(0)})`;
 
-        // Calculate and update tensions and forces
-        const { t1, t2, f1x, f1y, f2x, f2y } = this.calculateTensions();
+        // Calculate and update tensions, forces, and torques
+        const { t1, t2, f1x, f1y, f2x, f2y, torque1, torque2 } = this.calculateTensions();
+        
         document.getElementById('tension1').textContent = `${Math.abs(t1).toFixed(1)} N`;
         document.getElementById('tension2').textContent = `${Math.abs(t2).toFixed(1)} N`;
         document.getElementById('force3').textContent = 
             `${this.forceMagnitude.toFixed(1)} N at ${this.forceDirection}°`;
         
-        // Update force components at anchor points
+        // Update force components at points
         document.getElementById('p1-force').textContent = 
             `(${f1x.toFixed(1)}i, ${f1y.toFixed(1)}j) N`;
         document.getElementById('p2-force').textContent = 
             `(${f2x.toFixed(1)}i, ${f2y.toFixed(1)}j) N`;
+
+        // Update torques
+        document.getElementById('torque1').textContent = `${torque1.toFixed(1)} N⋅m`;
+        document.getElementById('torque2').textContent = `${torque2.toFixed(1)} N⋅m`;
+        document.getElementById('net-torque').textContent = `${(torque1 + torque2).toFixed(1)} N⋅m`;
     }
 
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Draw connecting arms from P0 to P1 and P2
+        this.ctx.strokeStyle = '#666';
+        this.ctx.setLineDash([5, 5]);
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.p0.x, this.p0.y);
+        this.ctx.lineTo(this.p1.x, this.p1.y);
+        this.ctx.moveTo(this.p0.x, this.p0.y);
+        this.ctx.lineTo(this.p2.x, this.p2.y);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+
         // Draw cables
+        this.ctx.strokeStyle = '#000';
         this.ctx.beginPath();
         this.ctx.moveTo(this.p1.x, this.p1.y);
         this.ctx.lineTo(this.p3.x, this.p3.y);
@@ -172,6 +221,7 @@ class TensionSimulation {
 
         // Draw points
         const points = [
+            { point: this.p0, label: "P0" },
             { point: this.p1, label: "P1" },
             { point: this.p2, label: "P2" },
             { point: this.p3, label: "P3" }

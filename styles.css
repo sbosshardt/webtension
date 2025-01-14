@@ -34,6 +34,8 @@ canvas {
     border: 1px solid #ccc;
     background-color: white;
     flex-shrink: 0;
+    width: 500px;
+    height: 400px;
 }
 
 .info-panel {
@@ -43,14 +45,14 @@ canvas {
     gap: 20px;
 }
 
-#coordinates, #forces {
+#coordinates, #forces, #torques {
     padding: 15px;
     background-color: #f8f8f8;
     border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-#coordinates div, #forces div {
+#coordinates div, #forces div, #torques div {
     margin-bottom: 8px;
     font-size: 14px;
 }
