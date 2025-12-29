@@ -2,6 +2,8 @@
 
 An interactive web-based simulation for visualizing and calculating tensions in a two-cable system with an applied force.
 
+**[🚀 Live Demo](https://sbosshardt.github.io/webtension/)**
+
 ## Overview
 
 WebTension is a physics simulation that allows users to explore how forces and tensions interact in a simple mechanical system. The simulation consists of a pivot point (P0) with two arms extending to points P1 and P2, which are connected by tensioned cables to a central point (P3). Users can apply a force to P3 and observe how the tensions in the cables and torques about P0 respond to changes in geometry and applied force.
@@ -26,8 +28,13 @@ WebTension is a physics simulation that allows users to explore how forces and t
 
 ## Usage
 
-1. Open `index.html` in a web browser
-2. Interact with the simulation:
+### Online
+Visit the **[Live Demo](https://sbosshardt.github.io/webtension/)** to use the simulation immediately without any setup.
+
+### Local Development
+1. Clone this repository
+2. Open `index.html` in a web browser
+3. Interact with the simulation:
    - Click and drag any point (P0, P1, P2, or P3) to reposition it
    - Use the "Force Magnitude" slider to adjust the force strength
    - Use the "Force Direction" slider to change the force angle
