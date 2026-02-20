@@ -124,6 +124,21 @@ canvas {
     border-color: #4444ff;
 }
 
+.toggle-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+.toggle-btn:hover {
+    background-color: #e8e8e8;
+}
+
 .reset-btn {
     padding: 6px 14px;
     font-size: 13px;

@@ -3,10 +3,11 @@ const DEFAULTS = {
     p1x: -100, p1y: 100,
     p2x: 100, p2y: 100,
     p3x: 0, p3y: 0,
-    fm: 10, fd: 270
+    fm: 10, fd: 270,
+    axes: 0
 };
 
-const STATE_KEYS = ['p0x','p0y','p1x','p1y','p2x','p2y','p3x','p3y','fm','fd'];
+const STATE_KEYS = ['p0x','p0y','p1x','p1y','p2x','p2y','p3x','p3y','fm','fd','axes'];
 const STORAGE_KEY = 'webtension';
 
 class Point {
@@ -30,6 +31,7 @@ class TensionSimulation {
         this.pointRadius = 8;
         this.forceMagnitude = 0;
         this.forceDirection = 0;
+        this.showAxes = false;
 
         this.lastSavedString = null;
         this.loadState(this.loadFromURL() || this.loadFromStorage() || DEFAULTS);
@@ -55,7 +57,8 @@ class TensionSimulation {
             p1x: this.toWorldX(this.p1.x), p1y: this.toWorldY(this.p1.y),
             p2x: this.toWorldX(this.p2.x), p2y: this.toWorldY(this.p2.y),
             p3x: this.toWorldX(this.p3.x), p3y: this.toWorldY(this.p3.y),
-            fm: this.forceMagnitude, fd: this.forceDirection
+            fm: this.forceMagnitude, fd: this.forceDirection,
+            axes: this.showAxes ? 1 : 0
         };
     }
 
@@ -70,6 +73,7 @@ class TensionSimulation {
         this.p3.y = this.toCanvasY(state.p3y);
         this.forceMagnitude = state.fm;
         this.forceDirection = state.fd;
+        this.showAxes = !!state.axes;
     }
 
     isDefault() {
@@ -173,6 +177,11 @@ class TensionSimulation {
 
         document.getElementById('resetDefaults').addEventListener('click', () => {
             this.resetToDefaults();
+        });
+
+        document.getElementById('toggleAxes').addEventListener('click', () => {
+            this.showAxes = !this.showAxes;
+            this.saveState();
         });
 
         window.addEventListener('resize', () => this.setupCanvas());
@@ -288,6 +297,7 @@ class TensionSimulation {
         this.syncInput('forceDirection', this.forceDirection);
 
         document.getElementById('resetDefaults').classList.toggle('hidden', this.isDefault());
+        document.getElementById('toggleAxes').textContent = this.showAxes ? 'Hide Axes' : 'Show Axes';
 
         // Calculate and update tensions, forces, and torques
         const { t1, t2, f1x, f1y, f2x, f2y, torque1, torque2 } = this.calculateTensions();
@@ -405,8 +415,69 @@ class TensionSimulation {
         return { pos, align, baseline };
     }
 
+    drawAxes() {
+        const cx = this.canvas.width / 2;
+        const cy = this.canvas.height / 2;
+        const tickSpacing = 50;
+        const tickSize = 4;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = '#ccc';
+        this.ctx.fillStyle = '#aaa';
+        this.ctx.font = '10px Arial';
+        this.ctx.lineWidth = 1;
+
+        // Axis lines
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, cy);
+        this.ctx.lineTo(this.canvas.width, cy);
+        this.ctx.moveTo(cx, 0);
+        this.ctx.lineTo(cx, this.canvas.height);
+        this.ctx.stroke();
+
+        // X-axis ticks and labels
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'top';
+        for (let wx = -Math.floor(cx / tickSpacing) * tickSpacing; wx <= cx; wx += tickSpacing) {
+            if (wx === 0) continue;
+            const x = this.toCanvasX(wx);
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, cy - tickSize);
+            this.ctx.lineTo(x, cy + tickSize);
+            this.ctx.stroke();
+            this.ctx.fillText(wx, x, cy + tickSize + 2);
+        }
+
+        // Y-axis ticks and labels
+        this.ctx.textAlign = 'right';
+        this.ctx.textBaseline = 'middle';
+        for (let wy = -Math.floor(cy / tickSpacing) * tickSpacing; wy <= cy; wy += tickSpacing) {
+            if (wy === 0) continue;
+            const y = this.toCanvasY(wy);
+            this.ctx.beginPath();
+            this.ctx.moveTo(cx - tickSize, y);
+            this.ctx.lineTo(cx + tickSize, y);
+            this.ctx.stroke();
+            this.ctx.fillText(wy, cx - tickSize - 3, y);
+        }
+
+        // Axis labels
+        this.ctx.fillStyle = '#999';
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('x', this.canvas.width - 14, cy + 4);
+        this.ctx.textAlign = 'right';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.fillText('y', cx - 4, 14);
+
+        this.ctx.restore();
+    }
+
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        if (this.showAxes) this.drawAxes();
 
         // Draw connecting arms from P0 to P1 and P2 (thick black lines)
         this.ctx.strokeStyle = '#000';
