@@ -1,3 +1,14 @@
+const DEFAULTS = {
+    p0x: 0, p0y: 150,
+    p1x: -100, p1y: 100,
+    p2x: 100, p2y: 100,
+    p3x: 0, p3y: 0,
+    fm: 10, fd: 270
+};
+
+const STATE_KEYS = ['p0x','p0y','p1x','p1y','p2x','p2y','p3x','p3y','fm','fd'];
+const STORAGE_KEY = 'webtension';
+
 class Point {
     constructor(x, y) {
         this.x = x;
@@ -11,19 +22,18 @@ class TensionSimulation {
         this.ctx = this.canvas.getContext('2d');
         this.setupCanvas();
 
-        // Initialize points
-        this.p0 = new Point(250, 50);  // Pivot point
-        this.p1 = new Point(100, 100);
-        this.p2 = new Point(400, 100);
-        this.p3 = new Point(250, 250);
-        
+        this.p0 = new Point(0, 0);
+        this.p1 = new Point(0, 0);
+        this.p2 = new Point(0, 0);
+        this.p3 = new Point(0, 0);
         this.selectedPoint = null;
         this.pointRadius = 8;
-        
-        // Force properties
-        this.forceMagnitude = 50;
-        this.forceDirection = 90;
-        
+        this.forceMagnitude = 0;
+        this.forceDirection = 0;
+
+        this.lastSavedString = null;
+        this.loadState(this.loadFromURL() || this.loadFromStorage() || DEFAULTS);
+
         this.setupEventListeners();
         this.animate();
     }
@@ -39,6 +49,77 @@ class TensionSimulation {
     toCanvasX(wx) { return wx + this.canvas.width / 2; }
     toCanvasY(wy) { return this.canvas.height / 2 - wy; }
 
+    getState() {
+        return {
+            p0x: this.toWorldX(this.p0.x), p0y: this.toWorldY(this.p0.y),
+            p1x: this.toWorldX(this.p1.x), p1y: this.toWorldY(this.p1.y),
+            p2x: this.toWorldX(this.p2.x), p2y: this.toWorldY(this.p2.y),
+            p3x: this.toWorldX(this.p3.x), p3y: this.toWorldY(this.p3.y),
+            fm: this.forceMagnitude, fd: this.forceDirection
+        };
+    }
+
+    loadState(state) {
+        this.p0.x = this.toCanvasX(state.p0x);
+        this.p0.y = this.toCanvasY(state.p0y);
+        this.p1.x = this.toCanvasX(state.p1x);
+        this.p1.y = this.toCanvasY(state.p1y);
+        this.p2.x = this.toCanvasX(state.p2x);
+        this.p2.y = this.toCanvasY(state.p2y);
+        this.p3.x = this.toCanvasX(state.p3x);
+        this.p3.y = this.toCanvasY(state.p3y);
+        this.forceMagnitude = state.fm;
+        this.forceDirection = state.fd;
+    }
+
+    isDefault() {
+        const state = this.getState();
+        return STATE_KEYS.every(k => state[k] === DEFAULTS[k]);
+    }
+
+    saveState() {
+        const state = this.getState();
+        const serialized = JSON.stringify(state);
+        if (serialized === this.lastSavedString) return;
+        this.lastSavedString = serialized;
+
+        try { localStorage.setItem(STORAGE_KEY, serialized); } catch (e) {}
+
+        const params = new URLSearchParams();
+        for (const k of STATE_KEYS) params.set(k, state[k]);
+        history.replaceState(null, '', '?' + params.toString());
+    }
+
+    loadFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has('p0x')) return null;
+        const state = {};
+        for (const k of STATE_KEYS) {
+            const v = params.get(k);
+            if (v === null) return null;
+            state[k] = parseFloat(v);
+            if (isNaN(state[k])) return null;
+        }
+        return state;
+    }
+
+    loadFromStorage() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return null;
+            const state = JSON.parse(raw);
+            if (STATE_KEYS.every(k => typeof state[k] === 'number')) return state;
+        } catch (e) {}
+        return null;
+    }
+
+    resetToDefaults() {
+        this.loadState(DEFAULTS);
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+        history.replaceState(null, '', window.location.pathname);
+        this.lastSavedString = null;
+    }
+
     getMousePos(e) {
         const rect = this.canvas.getBoundingClientRect();
         return {
@@ -50,8 +131,14 @@ class TensionSimulation {
     setupEventListeners() {
         this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
         this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
-        this.canvas.addEventListener('mouseup', () => this.selectedPoint = null);
-        this.canvas.addEventListener('mouseleave', () => this.selectedPoint = null);
+        this.canvas.addEventListener('mouseup', () => {
+            if (this.selectedPoint) this.saveState();
+            this.selectedPoint = null;
+        });
+        this.canvas.addEventListener('mouseleave', () => {
+            if (this.selectedPoint) this.saveState();
+            this.selectedPoint = null;
+        });
 
         this.setupCoordInput('p0', this.p0);
         this.setupCoordInput('p1', this.p1);
@@ -63,10 +150,12 @@ class TensionSimulation {
         magSlider.addEventListener('input', (e) => {
             this.forceMagnitude = parseFloat(e.target.value);
             magInput.value = this.forceMagnitude;
+            this.saveState();
         });
         magInput.addEventListener('change', (e) => {
             this.forceMagnitude = parseFloat(e.target.value) || 0;
             magSlider.value = this.forceMagnitude;
+            this.saveState();
         });
 
         const dirSlider = document.getElementById('forceDirection');
@@ -74,10 +163,16 @@ class TensionSimulation {
         dirSlider.addEventListener('input', (e) => {
             this.forceDirection = parseFloat(e.target.value);
             dirInput.value = this.forceDirection;
+            this.saveState();
         });
         dirInput.addEventListener('change', (e) => {
             this.forceDirection = parseFloat(e.target.value) || 0;
             dirSlider.value = this.forceDirection;
+            this.saveState();
+        });
+
+        document.getElementById('resetDefaults').addEventListener('click', () => {
+            this.resetToDefaults();
         });
 
         window.addEventListener('resize', () => this.setupCanvas());
@@ -88,9 +183,11 @@ class TensionSimulation {
         const yInput = document.getElementById(`${prefix}-y`);
         xInput.addEventListener('change', () => {
             point.x = this.toCanvasX(parseInt(xInput.value) || 0);
+            this.saveState();
         });
         yInput.addEventListener('change', () => {
             point.y = this.toCanvasY(parseInt(yInput.value) || 0);
+            this.saveState();
         });
     }
 
@@ -189,6 +286,8 @@ class TensionSimulation {
         this.syncInput('forceMagnitude', this.forceMagnitude);
         this.syncInput('forceDirectionInput', this.forceDirection);
         this.syncInput('forceDirection', this.forceDirection);
+
+        document.getElementById('resetDefaults').classList.toggle('hidden', this.isDefault());
 
         // Calculate and update tensions, forces, and torques
         const { t1, t2, f1x, f1y, f2x, f2y, torque1, torque2 } = this.calculateTensions();
