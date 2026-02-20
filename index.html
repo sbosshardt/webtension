@@ -14,10 +14,10 @@
             <div class="info-panel">
                 <div id="coordinates">
                     <h3>Coordinates</h3>
-                    <div>P0: <span id="p0-coords"></span></div>
-                    <div>P1: <span id="p1-coords"></span></div>
-                    <div>P2: <span id="p2-coords"></span></div>
-                    <div>P3: <span id="p3-coords"></span></div>
+                    <div class="coord-row">P0: x <input type="number" id="p0-x" class="coord-input"> y <input type="number" id="p0-y" class="coord-input"></div>
+                    <div class="coord-row">P1: x <input type="number" id="p1-x" class="coord-input"> y <input type="number" id="p1-y" class="coord-input"></div>
+                    <div class="coord-row">P2: x <input type="number" id="p2-x" class="coord-input"> y <input type="number" id="p2-y" class="coord-input"></div>
+                    <div class="coord-row">P3: x <input type="number" id="p3-x" class="coord-input"> y <input type="number" id="p3-y" class="coord-input"></div>
                 </div>
                 <div id="forces">
                     <h3>Forces</h3>
@@ -38,10 +38,16 @@
         </div>
         <div class="controls">
             <label>Force Magnitude:
-                <input type="range" id="forceMagnitude" min="0" max="100" value="50">
+                <div class="slider-row">
+                    <input type="range" id="forceMagnitude" min="0" max="100" value="50">
+                    <input type="number" id="forceMagnitudeInput" min="0" max="100" value="50" class="force-input">
+                </div>
             </label>
             <label>Force Direction (degrees):
-                <input type="range" id="forceDirection" min="0" max="360" value="90">
+                <div class="slider-row">
+                    <input type="range" id="forceDirection" min="0" max="360" value="90">
+                    <input type="number" id="forceDirectionInput" min="0" max="360" value="90" class="force-input">
+                </div>
             </label>
         </div>
     </div>

@@ -34,6 +34,11 @@ class TensionSimulation {
         this.ctx.lineWidth = 2;
     }
 
+    toWorldX(cx) { return cx - this.canvas.width / 2; }
+    toWorldY(cy) { return this.canvas.height / 2 - cy; }
+    toCanvasX(wx) { return wx + this.canvas.width / 2; }
+    toCanvasY(wy) { return this.canvas.height / 2 - wy; }
+
     getMousePos(e) {
         const rect = this.canvas.getBoundingClientRect();
         return {
@@ -48,15 +53,45 @@ class TensionSimulation {
         this.canvas.addEventListener('mouseup', () => this.selectedPoint = null);
         this.canvas.addEventListener('mouseleave', () => this.selectedPoint = null);
 
-        document.getElementById('forceMagnitude').addEventListener('input', (e) => {
+        this.setupCoordInput('p0', this.p0);
+        this.setupCoordInput('p1', this.p1);
+        this.setupCoordInput('p2', this.p2);
+        this.setupCoordInput('p3', this.p3);
+
+        const magSlider = document.getElementById('forceMagnitude');
+        const magInput = document.getElementById('forceMagnitudeInput');
+        magSlider.addEventListener('input', (e) => {
             this.forceMagnitude = parseFloat(e.target.value);
+            magInput.value = this.forceMagnitude;
+        });
+        magInput.addEventListener('change', (e) => {
+            this.forceMagnitude = parseFloat(e.target.value) || 0;
+            magSlider.value = this.forceMagnitude;
         });
 
-        document.getElementById('forceDirection').addEventListener('input', (e) => {
+        const dirSlider = document.getElementById('forceDirection');
+        const dirInput = document.getElementById('forceDirectionInput');
+        dirSlider.addEventListener('input', (e) => {
             this.forceDirection = parseFloat(e.target.value);
+            dirInput.value = this.forceDirection;
+        });
+        dirInput.addEventListener('change', (e) => {
+            this.forceDirection = parseFloat(e.target.value) || 0;
+            dirSlider.value = this.forceDirection;
         });
 
         window.addEventListener('resize', () => this.setupCanvas());
+    }
+
+    setupCoordInput(prefix, point) {
+        const xInput = document.getElementById(`${prefix}-x`);
+        const yInput = document.getElementById(`${prefix}-y`);
+        xInput.addEventListener('change', () => {
+            point.x = this.toCanvasX(parseInt(xInput.value) || 0);
+        });
+        yInput.addEventListener('change', () => {
+            point.y = this.toCanvasY(parseInt(yInput.value) || 0);
+        });
     }
 
     handleMouseDown(e) {
@@ -133,14 +168,27 @@ class TensionSimulation {
         return { t1, t2, f1x, f1y, f2x, f2y, torque1, torque2 };
     }
 
+    syncInput(id, value) {
+        const el = document.getElementById(id);
+        if (el !== document.activeElement) el.value = value;
+    }
+
     updateDisplay() {
-        // Display coordinates in world convention (Y-up, origin at center)
-        const wx = (p) => (p.x - this.canvas.width / 2).toFixed(0);
-        const wy = (p) => (this.canvas.height / 2 - p.y).toFixed(0);
-        document.getElementById('p0-coords').textContent = `(${wx(this.p0)}, ${wy(this.p0)})`;
-        document.getElementById('p1-coords').textContent = `(${wx(this.p1)}, ${wy(this.p1)})`;
-        document.getElementById('p2-coords').textContent = `(${wx(this.p2)}, ${wy(this.p2)})`;
-        document.getElementById('p3-coords').textContent = `(${wx(this.p3)}, ${wy(this.p3)})`;
+        // Sync coordinate inputs (world convention, Y-up, origin at center)
+        this.syncInput('p0-x', this.toWorldX(this.p0.x));
+        this.syncInput('p0-y', this.toWorldY(this.p0.y));
+        this.syncInput('p1-x', this.toWorldX(this.p1.x));
+        this.syncInput('p1-y', this.toWorldY(this.p1.y));
+        this.syncInput('p2-x', this.toWorldX(this.p2.x));
+        this.syncInput('p2-y', this.toWorldY(this.p2.y));
+        this.syncInput('p3-x', this.toWorldX(this.p3.x));
+        this.syncInput('p3-y', this.toWorldY(this.p3.y));
+
+        // Sync force inputs
+        this.syncInput('forceMagnitudeInput', this.forceMagnitude);
+        this.syncInput('forceMagnitude', this.forceMagnitude);
+        this.syncInput('forceDirectionInput', this.forceDirection);
+        this.syncInput('forceDirection', this.forceDirection);
 
         // Calculate and update tensions, forces, and torques
         const { t1, t2, f1x, f1y, f2x, f2y, torque1, torque2 } = this.calculateTensions();
@@ -150,13 +198,11 @@ class TensionSimulation {
         document.getElementById('force3').textContent = 
             `${this.forceMagnitude.toFixed(1)} N at ${this.forceDirection}°`;
         
-        // Update force components at points
         document.getElementById('p1-force').textContent = 
             `(${f1x.toFixed(1)}i, ${f1y.toFixed(1)}j) N`;
         document.getElementById('p2-force').textContent = 
             `(${f2x.toFixed(1)}i, ${f2y.toFixed(1)}j) N`;
 
-        // Update torques
         document.getElementById('torque1').textContent = `${torque1.toFixed(1)} N⋅m`;
         document.getElementById('torque2').textContent = `${torque2.toFixed(1)} N⋅m`;
         document.getElementById('net-torque').textContent = `${(torque1 + torque2).toFixed(1)} N⋅m`;
