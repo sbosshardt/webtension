@@ -29,21 +29,16 @@ class TensionSimulation {
     }
 
     setupCanvas() {
-        // Set the canvas resolution to match CSS size
         this.canvas.width = 500;
         this.canvas.height = 400;
         this.ctx.lineWidth = 2;
-        
-        // Store the canvas scale factors
-        this.scaleX = this.canvas.width / this.canvas.offsetWidth;
-        this.scaleY = this.canvas.height / this.canvas.offsetHeight;
     }
 
     getMousePos(e) {
         const rect = this.canvas.getBoundingClientRect();
         return {
-            x: (e.clientX - rect.left) * this.scaleX,
-            y: (e.clientY - rect.top) * this.scaleY
+            x: (e.clientX - rect.left - this.canvas.clientLeft) * (this.canvas.width / this.canvas.clientWidth),
+            y: (e.clientY - rect.top - this.canvas.clientTop) * (this.canvas.height / this.canvas.clientHeight)
         };
     }
 
@@ -61,11 +56,7 @@ class TensionSimulation {
             this.forceDirection = parseFloat(e.target.value);
         });
 
-        // Update scale factors when window is resized
-        window.addEventListener('resize', () => {
-            this.scaleX = this.canvas.width / this.canvas.offsetWidth;
-            this.scaleY = this.canvas.height / this.canvas.offsetHeight;
-        });
+        window.addEventListener('resize', () => this.setupCanvas());
     }
 
     handleMouseDown(e) {
@@ -85,8 +76,8 @@ class TensionSimulation {
         if (!this.selectedPoint) return;
 
         const pos = this.getMousePos(e);
-        this.selectedPoint.x = pos.x;
-        this.selectedPoint.y = pos.y;
+        this.selectedPoint.x = Math.round(pos.x);
+        this.selectedPoint.y = Math.round(pos.y);
     }
 
     calculateTensions() {
@@ -95,11 +86,11 @@ class TensionSimulation {
         const forceX = this.forceMagnitude * Math.cos(forceAngle);
         const forceY = this.forceMagnitude * Math.sin(forceAngle);
 
-        // Calculate angles and distances
+        // Cable directions from P3 to P1/P2 in world coordinates (Y-up)
         const dx1 = this.p1.x - this.p3.x;
-        const dy1 = this.p1.y - this.p3.y;
+        const dy1 = this.p3.y - this.p1.y;
         const dx2 = this.p2.x - this.p3.x;
-        const dy2 = this.p2.y - this.p3.y;
+        const dy2 = this.p3.y - this.p2.y;
 
         const length1 = Math.hypot(dx1, dy1);
         const length2 = Math.hypot(dx2, dy2);
@@ -130,12 +121,11 @@ class TensionSimulation {
         const f2x = -t2 * ux2;
         const f2y = -t2 * uy2;
 
-        // Calculate torques about P0
-        // Torque = r × F = rx*Fy - ry*Fx
+        // Torque position vectors in world coordinates (Y-up)
         const r1x = this.p1.x - this.p0.x;
-        const r1y = this.p1.y - this.p0.y;
+        const r1y = this.p0.y - this.p1.y;
         const r2x = this.p2.x - this.p0.x;
-        const r2y = this.p2.y - this.p0.y;
+        const r2y = this.p0.y - this.p2.y;
 
         const torque1 = r1x * f1y - r1y * f1x;
         const torque2 = r2x * f2y - r2y * f2x;
@@ -144,11 +134,13 @@ class TensionSimulation {
     }
 
     updateDisplay() {
-        // Update coordinates display
-        document.getElementById('p0-coords').textContent = `(${this.p0.x.toFixed(0)}, ${this.p0.y.toFixed(0)})`;
-        document.getElementById('p1-coords').textContent = `(${this.p1.x.toFixed(0)}, ${this.p1.y.toFixed(0)})`;
-        document.getElementById('p2-coords').textContent = `(${this.p2.x.toFixed(0)}, ${this.p2.y.toFixed(0)})`;
-        document.getElementById('p3-coords').textContent = `(${this.p3.x.toFixed(0)}, ${this.p3.y.toFixed(0)})`;
+        // Display coordinates in world convention (Y-up, origin at center)
+        const wx = (p) => (p.x - this.canvas.width / 2).toFixed(0);
+        const wy = (p) => (this.canvas.height / 2 - p.y).toFixed(0);
+        document.getElementById('p0-coords').textContent = `(${wx(this.p0)}, ${wy(this.p0)})`;
+        document.getElementById('p1-coords').textContent = `(${wx(this.p1)}, ${wy(this.p1)})`;
+        document.getElementById('p2-coords').textContent = `(${wx(this.p2)}, ${wy(this.p2)})`;
+        document.getElementById('p3-coords').textContent = `(${wx(this.p3)}, ${wy(this.p3)})`;
 
         // Calculate and update tensions, forces, and torques
         const { t1, t2, f1x, f1y, f2x, f2y, torque1, torque2 } = this.calculateTensions();
@@ -199,10 +191,10 @@ class TensionSimulation {
             }
         });
 
-        // Add force arrow angles if this is P3
+        // Add force arrow angles if this is P3 (negated for canvas Y-down)
         if (point === this.p3) {
-            const forceAngle = (this.forceDirection * Math.PI) / 180;
-            angles.push(forceAngle - 0.1, forceAngle, forceAngle + 0.1);
+            const canvasForceAngle = -(this.forceDirection * Math.PI) / 180;
+            angles.push(canvasForceAngle - 0.1, canvasForceAngle, canvasForceAngle + 0.1);
         }
 
         // Convert angles to sectors to avoid (each line takes up 60° sector for better avoidance)
@@ -295,7 +287,7 @@ class TensionSimulation {
         const forceAngle = (this.forceDirection * Math.PI) / 180;
         const arrowLength = this.forceMagnitude;
         const endX = this.p3.x + Math.cos(forceAngle) * arrowLength;
-        const endY = this.p3.y + Math.sin(forceAngle) * arrowLength;
+        const endY = this.p3.y - Math.sin(forceAngle) * arrowLength;
 
         this.ctx.beginPath();
         this.ctx.moveTo(this.p3.x, this.p3.y);
