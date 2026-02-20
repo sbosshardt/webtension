@@ -331,7 +331,7 @@ class TensionSimulation {
         // Draw force arrow
         this.ctx.strokeStyle = '#000';  // Black color for the force arrow
         const forceAngle = (this.forceDirection * Math.PI) / 180;
-        const arrowLength = this.forceMagnitude;
+        const arrowLength = 25 + (this.forceMagnitude / 4);
         const endX = this.p3.x + Math.cos(forceAngle) * arrowLength;
         const endY = this.p3.y - Math.sin(forceAngle) * arrowLength;
 
